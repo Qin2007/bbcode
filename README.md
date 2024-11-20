@@ -52,8 +52,11 @@ then you can add custom parse modes, custom parse modes can be added by `addpars
 where the key is the tag name and the value a function with the signature below
 
 ```php
-function (string $name, array $attributes, string $children, string $else):string
+function (string $name, array $attributes, string $children, string $else): string
 ```
 then call the `parse` method and the `toHTML` method to extract the html.
 
+## installation
 
+just copy the BBCode.php file to your server and require it. that's basically it.  
+you also need to copy the copyright notice too

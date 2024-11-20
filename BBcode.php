@@ -98,7 +98,8 @@ function _lexer(string $string): array
     $literal = true;
     $backslashed = false;
     $supercache = '';
-    foreach (str_split(_normalize_newlines__($string)) as $char) {
+    $string = _normalize_newlines__($string);
+    foreach (str_split($string) as $char) {
         if ($char == '\\') {
             $backslashed = true;
             continue;
@@ -134,7 +135,7 @@ function _AbstractSyntaxTree($semitokens): array
     foreach ($semitokens as $t) {
         if ($t['type'] === 'tag1') {
             $tag = ['name' => '', 'attrs' => [], 'type' => '_AbstractSyntaxTree',
-                'tagtext' => "{$t['Text']}", 'innerText' => ''
+                'tagtext' => "{$t['Text']}", 'innerText' => '', 'poppy' => 'mpve'
             ];
             if (str_starts_with($t['Text'], '[/')) {
                 $tag['close-ment-type'] = 'CLOSING';
@@ -152,7 +153,7 @@ function _AbstractSyntaxTree($semitokens): array
             foreach (_explode2__('', "$preg_result") as $explode) {
                 switch ($PHASE) {
                     case'NAME':
-                        if (preg_match('/[a-zA-Z\\-_0-9]/', "$explode")) {
+                        if (preg_match('/[a-zA-Z\\-_0-9*]/', "$explode")) {
                             $tag['name'] = "{$tag['name']}$explode";
                         } else {
                             if ($tag['close-ment-type'] == 'CLOSING') {
@@ -208,8 +209,9 @@ function _AbstractSyntaxTree($semitokens): array
                         break;
                     case'attrKey-spacefound':
                     case'attrKey':
-                        if (preg_match('/[a-zA-Z0-9]/', $explode) && $PHASE === 'attrKey-spacefound') {
-                            $tag['attrs']["$key"] = "__{$key}__";
+                        if ((preg_match('/[a-zA-Z0-9]/', $explode) && $PHASE === 'attrKey-spacefound')
+                            || $explode === '/') {
+                            $tag['attrs']["$key"] = "__$key";
                             $PHASE = 'attrKey';
                             $quoted = false;
                             $key = "$explode";
@@ -225,7 +227,7 @@ function _AbstractSyntaxTree($semitokens): array
                             break;
                         }
                         if ($explode === ']') {
-                            //$tag['attrs']["$key"] = "\$undefined";
+                            $tag['attrs']["$key"] = "__$key";
                             break;
                         }
                         $key = "$key$explode";
@@ -237,6 +239,10 @@ function _AbstractSyntaxTree($semitokens): array
                         }
                         break;
                     default:
+                }
+                if ("{$tag['name']}" === '*') {
+                    $tag['name'] = 'li';
+                    $PHASE = 'tween';
                 }
             }
             $return[] = $tag;
@@ -255,7 +261,7 @@ function _array_insert(array &$array, mixed $new): void
 
 function _bbml_encode__(string $value): string
 {
-    $str = _htmlspecialchars12__("$value");
+    $str = _html_encode__("$value");
     $str = str_replace('[', "\\[", "$str");
     return str_replace(']', "\\]", "$str");
 }
@@ -288,19 +294,19 @@ class _AST2_TEXT implements JsonSerializable
 
     public function toString(): string
     {
-        return $this->string;
-        //return _bbml_encode__("$this->string");
+        //return $this->string;
+        return "$this->string";
     }
 
     public function __toString(): string
     {
-        return _bbml_encode__("$this->string");
+        return _html_encode__("$this->string");
         //return $this->toString();
     }
 
     public function jsonSerialize(): array
     {
-        return ['string' => _bbml_encode__("$this->string"), 'type' => '_AST2_TEXT'];
+        return ['string' => "$this->string", 'type' => '_AST2_TEXT'];
     }
 }
 
@@ -349,11 +355,13 @@ class _AST2 implements JsonSerializable
 
     public function toString(EncodeMode $mode, array $parsemodes = []): string
     {
+        //$class = '';
         $attrs_str = '';
         foreach ($this->attrs as $key => $val) {
             $key = "$mode->value"($key);
             $val = "$mode->value"($val);
             $attrs_str = "$attrs_str $key=\"$val\"";
+            //if ($key === 'class') $class = "class=\"$val\"";
         }
         $children = '';
         foreach ($this->children as $child) {
@@ -450,12 +458,12 @@ class _AST2 implements JsonSerializable
                         if (array_key_exists('src', $attrs)) {
                             $src = _htmlspecialchars12__("{$attrs['src']}");
                         } else {
-                            $src = _bbml_encode__("$children");//$innerText;
+                            $src = _bbml_encode__("$children");
                         }
                         if (strlen($src) > 0) {
                             $url = "src=\"$src\"";
-                        }/*
-                        if (array_key_exists('width', $attrs)) {
+                        }
+                        /*if (array_key_exists('width', $attrs)) {
                             $width = _htmlspecialchars12__("{$attrs['width']}");
                             $size = "$size width=\"$width\"";
                         }
@@ -507,7 +515,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
     $rtrn = [];
     $properly_closed = false;
     $previously_opened = null;
-    $just_closed_tag_name = null;
+    //$just_closed_tag_name = null;
     foreach ($AbstractSyntaxTree as $li) {
         switch ($li['close-ment-type']) {
             case'OPENING':
@@ -539,11 +547,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                     $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
                 }
                 $properly_closed = false;
-                $cache = new _AST2($li['name'], [...$li['attrs'],
-                    '$parent' => $parent, '$thisContext' => $thisContext,
-                    '$just_closed_tag_name' => ($just_closed_tag_name === null ? 'null' : $just_closed_tag_name),
-                    '$previously_opened' => ($previously_opened === null ? 'null' : $previously_opened),
-                ]);
+                $cache = new _AST2($li['name'], $li['attrs']);
                 $openingtag->appendChild($cache);
                 $openingtag = $cache;
                 $previously_opened = $cache->name();
@@ -552,8 +556,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
             case'CLOSING':
                 $just_closed_tag = array_pop($openingtags);
                 $next_opening_tag = $openingtags[count($openingtags) - 1] ?? $root;
-                if (!is_null($just_closed_tag))
-                    $just_closed_tag_name = $just_closed_tag->name();
+                //if (!is_null($just_closed_tag)) $just_closed_tag_name = $just_closed_tag->name();
                 $openingtag = $next_opening_tag;
                 $properly_closed = true;
                 break;
@@ -629,8 +632,8 @@ class BBCode implements JsonSerializable
      */
     public function setparseModes(array $parseModes): self
     {
-        $this->parseModes = $parseModes;
-        return $this;
+        $this->parseModes = [];
+        return $this->addparseModes($parseModes);
     }
 
     public function setdebugMode(bool $enabled): self
