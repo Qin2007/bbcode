@@ -135,7 +135,7 @@ function _AbstractSyntaxTree($semitokens): array
     foreach ($semitokens as $t) {
         if ($t['type'] === 'tag1') {
             $tag = ['name' => '', 'attrs' => [], 'type' => '_AbstractSyntaxTree',
-                'tagtext' => "{$t['Text']}", 'innerText' => '', 'poppy' => 'mpve'
+                'tagtext' => "{$t['Text']}", 'innerText' => ''
             ];
             if (str_starts_with($t['Text'], '[/')) {
                 $tag['close-ment-type'] = 'CLOSING';
@@ -173,6 +173,9 @@ function _AbstractSyntaxTree($semitokens): array
                             $val_reached = true;
                             $quoted = true;
                             break;
+                        }
+                        if (preg_match('/[a-zA-Z0-9]/', $explode)) {
+                            $val_reached = true;
                         }
                         if ($quoted) {
                             if ($explode == '"') {
@@ -353,6 +356,11 @@ class _AST2 implements JsonSerializable
         return $this;
     }
 
+    public function getChildren(): array
+    {
+        return $this->children;
+    }
+
     public function toString(EncodeMode $mode, array $parsemodes = []): string
     {
         //$class = '';
@@ -463,28 +471,6 @@ class _AST2 implements JsonSerializable
                         if (strlen($src) > 0) {
                             $url = "src=\"$src\"";
                         }
-                        /*if (array_key_exists('width', $attrs)) {
-                            $width = _htmlspecialchars12__("{$attrs['width']}");
-                            $size = "$size width=\"$width\"";
-                        }
-                        if (array_key_exists('width%', $attrs)) {
-                            $width = _htmlspecialchars12__("{$attrs['width%']}");
-                            if (preg_match('/^\\d+$/D', $width)) {
-                                $width = "$width%";
-                            }
-                            $style = "width:$width;";
-                        }
-                        if (array_key_exists('height%', $attrs)) {
-                            $height = _htmlspecialchars12__("{$attrs['height%']}");
-                            if (preg_match('/^\\d+$/D', $height)) {
-                                $height = "$height%";
-                            }
-                            $style = "height:$height;";
-                        }
-                        if (array_key_exists('height', $attrs)) {
-                            $height = _htmlspecialchars12__("{$attrs['height']}");
-                            $size = "$size height=\"$height\"";
-                        }*/
                         if (strlen("$alt") > 0) $alt = "alt=\"$alt\"";
                         return '<' . "img $url $alt$size style=\"$style\"/>";
                     case'root':
@@ -686,10 +672,10 @@ class BBCode implements JsonSerializable
         return $this->toArray();
     }
 
-    public function toArray(): array
+    public function toArray(): ?array
     {
-        $parsed = is_null($this->parsed) ?
-            null : $this->parsed->jsonSerialize();
+        if (is_null($this->parsed)) return null;
+        $parsed =  json_decode(json_encode($this->parsed->jsonSerialize()),true);
         if ($this->debug_mode) {
             return ['parsed' => $parsed,
                 'innerArray' => $this->array];

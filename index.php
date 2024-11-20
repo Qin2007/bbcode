@@ -5,11 +5,7 @@ require_once 'BBcode.php';
 // but not edit it to the repository, otherwise feel free to use this too.
 $COMPOUND = <<<'BBCODE'
 [h1]BBCode parser[/h1]
-
 BBCODE;
-for ($i = 0; $i < 124; $i++) {
-    $COMPOUND = "{$COMPOUND}[*]$i\n";
-}
 $bbcode = new BBCode("$COMPOUND");
 $bbcode->parse();//->addparseModes([]);
 echo "{$bbcode->toHTML()}";
