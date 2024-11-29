@@ -570,10 +570,13 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 // in memory of $lowercase_name_old and $lowercase_name_new
                 //$parent = ($openingtags[count($openingtags) - 1] ?? $root)->name();
                 $thisContext = strtolower("{$li['name']}");
-                if ($thisContext === 'p' && $previously_opened === 'p') {
+                if ($previously_opened === 'p' && in_array(
+                        $thisContext, _explode2__('/[, ]/',
+                        'p,ol,ul,li,h1,h2,h3,h4,h5,h6'))) {
                     array_pop($openingtags);
                     $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                } elseif ($thisContext === 'li' && $previously_opened === 'li') {
+                }
+                if ($thisContext === 'li' && $previously_opened === 'li') {
                     array_pop($openingtags);
                     $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
                 } else {
@@ -596,6 +599,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                         if (in_array('li', $explodes_list)) {
                             foreach (array_reverse($openingtags) as $option) {
                                 array_pop($openingtags);
+                                $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
                                 if ($option->name() == 'li') {
                                     break;
                                 }
@@ -635,10 +639,12 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 $openingtags[] = $openingtag;
                 break;
             case'CLOSING':
-                /*$just_closed_tag =*/ array_pop($openingtags);
-                $next_opening_tag = $openingtags[count($openingtags) - 1] ?? $root;
+                array_pop($openingtags);
+                $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                //$just_closed_tag = array_pop($openingtags);
+                //$next_opening_tag = $openingtags[count($openingtags) - 1] ?? $root;
                 //if (!is_null($just_closed_tag)) $just_closed_tag_name = $just_closed_tag->name();
-                $openingtag = $next_opening_tag;
+                //$openingtag = $next_opening_tag;
                 //$properly_closed = true;
 
                 /*$index = 0;echo"\n";
