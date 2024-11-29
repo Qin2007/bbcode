@@ -97,35 +97,64 @@ function _lexer(string $string): array
     $return = [];
     $literal = true;
     $backslashed = false;
-    $supercache = '';
+    $collected_letters = '';
     $string = _normalize_newlines__($string);
+    $string2 = '';
+    $CDATA = false;
     foreach (str_split($string) as $char) {
+        $string2_temp = "$string2$char";
+        /*if (preg_match('/(?:<!\\[CDATA\\[|\\[(?i)CDATA(?-i)])$/D', $string2_temp) && !$CDATA) {
+        $CDATA = true;$string2 = preg_replace('/(?:<!\\[CDATA\\[|\\[(?i)CDATA(?-i)])$/D', '', $string2_temp);
+        continue;}if (preg_match('/(?:\\\\?]\\\\?]>|\\\\?\\[\\/(?i)CDATA(?-i)\\\\?])$/D', $string2_temp) && $CDATA) {
+        $CDATA = false;$string2 = preg_replace('/(?:\\\\?]\\\\?]>|\\\\?\\[\\/(?i)CDATA(?-i)\\\\?])$/D', '',
+        $string2_temp);continue;}*/
+        if (preg_match('/<!\\[CDATA\\[$/D', $string2_temp) && !$CDATA) {
+            $CDATA = true;
+            $string2 = preg_replace('/<!\\[CDATA\\[$/D', '', $string2_temp);
+            continue;
+        }
+        if (preg_match('/\\\\?]\\\\?]>$/D', $string2_temp) && $CDATA) {
+            $CDATA = false;
+            $string2 = preg_replace('/\\\\?]\\\\?]>$/D', '',
+                $string2_temp);
+            continue;
+        }
+        if ($CDATA) {
+            $string2 = match ($char) {
+                '[', ']' => "$string2\\$char",
+                default => "$string2$char",
+            };
+            continue;
+        }
+        $string2 = "$string2$char";
+    }
+    foreach (str_split($string2) as $char) {
         if ($char == '\\') {
             $backslashed = true;
             continue;
         }
         if ($literal) {
-            if ($char == '[' && $backslashed === false) {
+            if ($char === '[' && $backslashed === false) {
                 $literal = false;
-                if (strlen($supercache) > 0) {
-                    $return[] = ['Text' => $supercache, 'type' => 'TEXT'];
+                if (strlen($collected_letters) > 0) {
+                    $return[] = ['Text' => $collected_letters, 'type' => 'TEXT'];
                 }
-                $supercache = '';
+                $collected_letters = '';
                 $cache = '[';
             } else {
-                $supercache = "$supercache$char";
+                $collected_letters = "$collected_letters$char";
             }
         } else {
             $cache = "$cache$char";
-            if ($char === ']') {
+            if ($char === ']' && $backslashed === false) {
                 $literal = true;
                 $return[] = ['Text' => $cache, 'type' => 'tag1'];
             }
         }
         $backslashed = false;
     }
-    if (strlen($supercache) > 0)
-        $return[] = ['Text' => $supercache, 'type' => 'TEXT'];
+    if (strlen($collected_letters) > 0)
+        $return[] = ['Text' => $collected_letters, 'type' => 'TEXT'];
     return ['$return' => $return];
 }
 
@@ -295,15 +324,22 @@ class _AST2_TEXT implements JsonSerializable
         $this->string = $string;
     }
 
-    public function toString(): string
+    public function toString($_, $__, $options = null): string
     {
-        //return $this->string;
-        return "$this->string";
+        /*if ($options['htmlencode']) {
+            return _html_encode__("$this->string");
+        }
+        return "$this->string";*/
+        return match ($options['htmlencode']) {
+            EncodeMode::innerText => _return_that__("$this->string"),
+            EncodeMode::BBCode => _bbml_encode__("$this->string"),
+            default => _html_encode__("$this->string"),
+        };
     }
 
     public function __toString(): string
     {
-        return _html_encode__("$this->string");
+        return ("$this->string");
         //return $this->toString();
     }
 
@@ -361,7 +397,7 @@ class _AST2 implements JsonSerializable
         return $this->children;
     }
 
-    public function toString(EncodeMode $mode, array $parsemodes = []): string
+    public function toString(EncodeMode $mode, array $parsemodes = [], array $options = null): string
     {
         //$class = '';
         $attrs_str = '';
@@ -373,7 +409,7 @@ class _AST2 implements JsonSerializable
         }
         $children = '';
         foreach ($this->children as $child) {
-            $children = "$children{$child->toString($mode, $parsemodes)}";
+            $children = "$children{$child->toString($mode, $parsemodes, $options)}";
         }
         $else = "[$this->name$attrs_str]{$children}[/$this->name]";
         return match ($mode) {
@@ -494,23 +530,82 @@ class _AST2 implements JsonSerializable
     }
 }
 
+/*function attempt_closure(&$openingtags, &$openingtag, &$root): true
+{
+    $index = 0;
+    foreach (array_reverse($openingtags) as $item) {
+        $index++;
+        //$count = count($openingtags);echo "\n&lt;({$item->name()})::({$openingtag->name()})::($index):($count)&gt;";
+        if ($item->name() === $openingtag->name()) {
+            break;
+        }
+    }
+    if (count($openingtags) < $index && $index > 0) {
+        for ($i = 0; $i < $index; $i++) {
+            array_pop($openingtags);
+        }
+    } else {
+        array_pop($openingtags);
+    }
+    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+    return true;
+}*/
+
 function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
 {
     $root = $openingtag = new _AST2('root', ['class' => 'bbcode_car']);
-    $openingtags = array();
-    $rtrn = [];
-    $properly_closed = false;
+    $openingtags = [];
+    $rtrn = array();
+    //$properly_closed = false;
     $previously_opened = null;
     //$just_closed_tag_name = null;
     foreach ($AbstractSyntaxTree as $li) {
+        if (in_array("{$li['close-ment-type']}", explode(',', 'OPENING,CLOSING'))) {
+            if (in_array(strtolower("{$li['name']}"), explode(',', 'br,hr'))) {
+                $li['close-ment-type'] = 'SELF-CLOSING';
+            }
+        }
         switch ($li['close-ment-type']) {
             case'OPENING':
                 // in memory of $lowercase_name_old and $lowercase_name_new
-                $parent = ($openingtags[count($openingtags) - 1] ?? $root)->name();
+                //$parent = ($openingtags[count($openingtags) - 1] ?? $root)->name();
                 $thisContext = strtolower("{$li['name']}");
-                $break = false;
+                if ($thisContext === 'p' && $previously_opened === 'p') {
+                    array_pop($openingtags);
+                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                } elseif ($thisContext === 'li' && $previously_opened === 'li') {
+                    array_pop($openingtags);
+                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                } else {
+                    $list = '';
+                    foreach ($openingtags as $opening_tag) {
+                        $list = "$list,{$opening_tag->name()}";
+                    }
+                    $list = preg_replace('/^,/', '', $list);
+
+                    if ($thisContext === 'li') {
+                        if (($list2 = strrpos($list, 'ol')) !== false) {
+                            $list2 = substr($list, $list2);
+                        } elseif (($list2 = strrpos($list, 'ul')) !== false) {
+                            $list2 = substr($list, $list2);
+                        } else {
+                            $list2 = $list;
+                        }
+                        //echo "\n&lt;$list2&gt;<br/>";
+                        $explodes_list = explode(',', $list2);
+                        if (in_array('li', $explodes_list)) {
+                            foreach (array_reverse($openingtags) as $option) {
+                                array_pop($openingtags);
+                                if ($option->name() == 'li') {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                /*
                 switch ($previously_opened) {
-                    case'p':
+                    case 'p':
                         $break = in_array(
                             $thisContext,
                             _explode2__(
@@ -518,7 +613,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                                 'p,ol,ul,li,h1,h2,h3,h4,h5,h6'
                             ));
                         break;
-                    case'li':
+                    case 'li':
                         $break = in_array(
                             $thisContext,
                             _explode2__(
@@ -531,8 +626,8 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 if ($break && !$properly_closed) {
                     array_pop($openingtags);
                     $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                }
-                $properly_closed = false;
+                }// */
+                //$properly_closed = false;
                 $cache = new _AST2($li['name'], $li['attrs']);
                 $openingtag->appendChild($cache);
                 $openingtag = $cache;
@@ -540,11 +635,30 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 $openingtags[] = $openingtag;
                 break;
             case'CLOSING':
-                $just_closed_tag = array_pop($openingtags);
+                /*$just_closed_tag =*/ array_pop($openingtags);
                 $next_opening_tag = $openingtags[count($openingtags) - 1] ?? $root;
                 //if (!is_null($just_closed_tag)) $just_closed_tag_name = $just_closed_tag->name();
                 $openingtag = $next_opening_tag;
-                $properly_closed = true;
+                //$properly_closed = true;
+
+                /*$index = 0;echo"\n";
+                foreach (array_reverse($openingtags) as $item) {
+                    $index++;$count=count($openingtags);
+                    echo "\n&lt;({$item->name()})::({$openingtag->name()})::($index):($count)&gt;";
+                    if ($item->name() === $openingtag->name()) {
+                        break;
+                    }
+                }
+                if (count($openingtags) < $index && $index > 0) {
+                    for ($i = 0; $i < $index; $i++) {
+                        array_pop($openingtags);
+                    }
+                } else {
+                    array_pop($openingtags);
+                }
+                $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                $properly_closed = true;*/
+                //$properly_closed = attempt_closure($openingtags, $openingtag, $root);
                 break;
             case'SELF-CLOSING':
                 $openingtag->appendChild(new _AST2($li['name'], $li['attrs']));
@@ -565,6 +679,7 @@ class BBCode implements JsonSerializable
     private array $array = array();
     private ?_AST2 $parsed = null;
     private bool $debug_mode = false;
+    private array $options = array('htmlencode' => EncodeMode::HTML);
 
     /**
      * parses BBCode to HTML
@@ -596,6 +711,14 @@ class BBCode implements JsonSerializable
     public function addparseModes(array $parseModes): self
     {
         foreach ($parseModes as $parseName => $parseMode) {
+            if ('settings' === $parseName) {
+                if (is_array($parseMode)) {
+                    if (array_key_exists('htmlencode', $parseMode)) {
+                        $this->options['htmlencode'] = $parseMode['htmlencode'];
+                    }
+                }
+                continue;
+            }
             $this->parseModes[$parseName] = $parseMode;
         }
         return $this;
@@ -647,7 +770,8 @@ class BBCode implements JsonSerializable
     public function toHTML(): ?string
     {
         if (is_null($this->parsed)) return null;
-        return "<div class=bbcode_car role=none>{$this->parsed->toString(EncodeMode::HTML, $this->parseModes)}</div>";
+        $parsed = $this->parsed->toString(EncodeMode::HTML, $this->parseModes, $this->options);
+        return "<div class=bbcode_car role=none>$parsed</div>";
     }
 
     public function toJSON_HTML(int $indent = 2): ?string
@@ -675,7 +799,7 @@ class BBCode implements JsonSerializable
     public function toArray(): ?array
     {
         if (is_null($this->parsed)) return null;
-        $parsed =  json_decode(json_encode($this->parsed->jsonSerialize()),true);
+        $parsed = json_decode(json_encode($this->parsed->jsonSerialize()), true);
         if ($this->debug_mode) {
             return ['parsed' => $parsed,
                 'innerArray' => $this->array];
