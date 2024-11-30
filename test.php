@@ -5,6 +5,8 @@ require_once 'BBcode.php';
 // but not edit it to the repository, otherwise feel free to use this too.
 
 $COMPOUND = <<<'BBCODE'
+[h1]Scraper boy.spec[/h1]
+[spoiler spoilerfor="ai first draft"]
 [p]If someone were bitten by a radioactive web scraper, their superpowers might include:
 [ol]
     [li]
@@ -92,11 +94,24 @@ $COMPOUND = <<<'BBCODE'
         [h3]Vulnerability to Anti-Scraping Tools[/h3]
         [p]Weak against individuals or entities employing countermeasures like fake data, honeypots, or obfuscation to
             confuse or trap them.[/p]
-[/ol]
+[/ol][/spoiler]
 BBCODE;
 $bbcode = new BBCode("\n\n$COMPOUND\n\n");
 $outerHTML = (function (string $name, array $attributes, string $children, string $else): string {
     return $else;
 });
-$bbcode->parse()->setdebugMode(true)->addparseModes(['outerHTML' => $outerHTML]);
-echo "\n{$bbcode->toJSON_HTML()}";
+$bbcode->parse()->setdebugMode(true)->addparseModes([
+    'spoiler' => (function (string $name, array $attrs, string $children, string $else): string {
+        $open = '';
+        if (array_key_exists('spoilerfor', $attrs)) {
+            $spoilerfor = "{$attrs['spoilerfor']}";
+        } else {
+            $spoilerfor = "spoilers";
+        }
+        if (array_key_exists('open', $attrs)) {
+            $open = "open=\"\"";
+        }
+        return "<details $open><summary>$spoilerfor</summary><div>$children</div></details>";
+    }),
+]);
+echo "\n{$bbcode->toJSON_HTML(4)}";

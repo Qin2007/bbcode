@@ -529,34 +529,22 @@ class _AST2 implements JsonSerializable
         ];
     }
 }
-
-/*function attempt_closure(&$openingtags, &$openingtag, &$root): true
+function opening_tag_list_toString(array $opening_tags): string
 {
-    $index = 0;
-    foreach (array_reverse($openingtags) as $item) {
-        $index++;
-        //$count = count($openingtags);echo "\n&lt;({$item->name()})::({$openingtag->name()})::($index):($count)&gt;";
-        if ($item->name() === $openingtag->name()) {
-            break;
-        }
+
+    $list = '';
+    foreach ($opening_tags as $opening_tag) {
+        $list = "$list,{$opening_tag->name()}";
     }
-    if (count($openingtags) < $index && $index > 0) {
-        for ($i = 0; $i < $index; $i++) {
-            array_pop($openingtags);
-        }
-    } else {
-        array_pop($openingtags);
-    }
-    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-    return true;
-}*/
+    return preg_replace('/^,/', '', $list);
+}
 
 function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
 {
     $root = $openingtag = new _AST2('root', ['class' => 'bbcode_car']);
     $openingtags = [];
     $rtrn = array();
-    //$properly_closed = false;
+    $properly_closed = false;
     $previously_opened = null;
     //$just_closed_tag_name = null;
     foreach ($AbstractSyntaxTree as $li) {
@@ -570,68 +558,42 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 // in memory of $lowercase_name_old and $lowercase_name_new
                 //$parent = ($openingtags[count($openingtags) - 1] ?? $root)->name();
                 $thisContext = strtolower("{$li['name']}");
-                if ($previously_opened === 'p' && in_array(
-                        $thisContext, _explode2__('/[, ]/',
-                        'p,ol,ul,li,h1,h2,h3,h4,h5,h6'))) {
-                    array_pop($openingtags);
-                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                }
-                if ($thisContext === 'li' && $previously_opened === 'li') {
-                    array_pop($openingtags);
-                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                } else {
-                    $list = '';
-                    foreach ($openingtags as $opening_tag) {
-                        $list = "$list,{$opening_tag->name()}";
+                if (!$properly_closed) {
+                    //echo"\n&lt;$previously_opened::$thisContext&gt;<br/>";
+                    if ($previously_opened === 'p' && in_array(
+                            $thisContext, explode(',',
+                            'p,ol,ul,li,h1,h2,h3,h4,h5,h6'))) {
+                        array_pop($openingtags);
+                        $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
                     }
-                    $list = preg_replace('/^,/', '', $list);
-
-                    if ($thisContext === 'li') {
-                        if (($list2 = strrpos($list, 'ol')) !== false) {
-                            $list2 = substr($list, $list2);
-                        } elseif (($list2 = strrpos($list, 'ul')) !== false) {
-                            $list2 = substr($list, $list2);
-                        } else {
-                            $list2 = $list;
-                        }
-                        //echo "\n&lt;$list2&gt;<br/>";
-                        $explodes_list = explode(',', $list2);
-                        if (in_array('li', $explodes_list)) {
-                            foreach (array_reverse($openingtags) as $option) {
-                                array_pop($openingtags);
-                                $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                                if ($option->name() == 'li') {
-                                    break;
+                    if ($thisContext === 'li' && $previously_opened === 'li') {
+                        array_pop($openingtags);
+                        $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                    } else {
+                        $list = opening_tag_list_toString($openingtags);
+                        if (in_array($thisContext, explode(',', 'li,ol,ul'))) {
+                            if (($list2 = strrpos($list, 'ol')) !== false) {
+                                $list2 = substr($list, $list2);
+                            } elseif (($list2 = strrpos($list, 'ul')) !== false) {
+                                $list2 = substr($list, $list2);
+                            } else {
+                                $list2 = $list;
+                            }
+                            //echo "\n&lt;$list2&gt;<br/>";
+                            $explodes_list = explode(',', $list2);
+                            if (in_array('li', $explodes_list)) {
+                                foreach (array_reverse($openingtags) as $option) {
+                                    array_pop($openingtags);
+                                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                                    if ($option->name() == 'li') {
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                /*
-                switch ($previously_opened) {
-                    case 'p':
-                        $break = in_array(
-                            $thisContext,
-                            _explode2__(
-                                '/[, ]/',
-                                'p,ol,ul,li,h1,h2,h3,h4,h5,h6'
-                            ));
-                        break;
-                    case 'li':
-                        $break = in_array(
-                            $thisContext,
-                            _explode2__(
-                                '/[, ]/',
-                                'ol,ul,li'
-                            ));
-                        break;
-                    default:
-                }
-                if ($break && !$properly_closed) {
-                    array_pop($openingtags);
-                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                }// */
-                //$properly_closed = false;
+                $properly_closed = false;
                 $cache = new _AST2($li['name'], $li['attrs']);
                 $openingtag->appendChild($cache);
                 $openingtag = $cache;
@@ -639,32 +601,31 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 $openingtags[] = $openingtag;
                 break;
             case'CLOSING':
-                array_pop($openingtags);
-                $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                //array_pop($openingtags);
+                //$openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+
                 //$just_closed_tag = array_pop($openingtags);
                 //$next_opening_tag = $openingtags[count($openingtags) - 1] ?? $root;
                 //if (!is_null($just_closed_tag)) $just_closed_tag_name = $just_closed_tag->name();
                 //$openingtag = $next_opening_tag;
-                //$properly_closed = true;
 
-                /*$index = 0;echo"\n";
+                $index = 0;
                 foreach (array_reverse($openingtags) as $item) {
-                    $index++;$count=count($openingtags);
-                    echo "\n&lt;({$item->name()})::({$openingtag->name()})::($index):($count)&gt;";
+                    $index++;
+                    //$count = count($openingtags);
+                    //echo "\n&lt;({$item->name()})::({$openingtag->name()})::($index)&gt;";
                     if ($item->name() === $openingtag->name()) {
                         break;
                     }
                 }
-                if (count($openingtags) < $index && $index > 0) {
+                //echo "\n&lt;$index::" . count($openingtags) . "&gt;<br/>";
+                if (count($openingtags) >= $index && $index > 0) {
                     for ($i = 0; $i < $index; $i++) {
                         array_pop($openingtags);
                     }
-                } else {
-                    array_pop($openingtags);
-                }
+                } // else {array_pop($openingtags);}
                 $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                $properly_closed = true;*/
-                //$properly_closed = attempt_closure($openingtags, $openingtag, $root);
+                $properly_closed = true;
                 break;
             case'SELF-CLOSING':
                 $openingtag->appendChild(new _AST2($li['name'], $li['attrs']));
