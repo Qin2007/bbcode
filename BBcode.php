@@ -91,44 +91,68 @@ function _implode2__(string $seperator, array $array): string
     return implode($seperator, $array);
 }
 
-function _lexer(string $string): array
+function h($bool, $exmen): string
 {
-    $cache = '';
-    $return = [];
-    $literal = true;
-    $backslashed = false;
-    $collected_letters = '';
-    $string = _normalize_newlines__($string);
+    return "&lt;&quot;" . ($bool ? 'true' : 'false') . "&quot;::&quot;$exmen&quot;&gt;\n\n";
+}
+
+function _lexer(string $string, array $parseModes): array
+{
     $string2 = '';
     $CDATA = false;
-    foreach (str_split($string) as $char) {
+    $parseModes_count = count($parseModes);
+    foreach (str_split(_normalize_newlines__($string)) as $char) {
         $string2_temp = "$string2$char";
-        /*if (preg_match('/(?:<!\\[CDATA\\[|\\[(?i)CDATA(?-i)])$/D', $string2_temp) && !$CDATA) {
-        $CDATA = true;$string2 = preg_replace('/(?:<!\\[CDATA\\[|\\[(?i)CDATA(?-i)])$/D', '', $string2_temp);
-        continue;}if (preg_match('/(?:\\\\?]\\\\?]>|\\\\?\\[\\/(?i)CDATA(?-i)\\\\?])$/D', $string2_temp) && $CDATA) {
-        $CDATA = false;$string2 = preg_replace('/(?:\\\\?]\\\\?]>|\\\\?\\[\\/(?i)CDATA(?-i)\\\\?])$/D', '',
-        $string2_temp);continue;}*/
         if (preg_match('/<!\\[CDATA\\[$/D', $string2_temp) && !$CDATA) {
             $CDATA = true;
             $string2 = preg_replace('/<!\\[CDATA\\[$/D', '', $string2_temp);
             continue;
         }
+        if (!$CDATA && $parseModes_count > 0) {
+            $just_matched = false;
+            foreach ($parseModes as $parseMode => $closure) {
+                if (preg_match('/^pre:([a-z_A-Z][a-z_A-Z0-9]*)$/D', "$parseMode", $matches)) {
+                    $regex = "/<!\\[$matches[1]\\[$/D";
+                    if (preg_match($regex, $string2_temp)) {
+                        $string2 = preg_replace($regex, '', $string2_temp);
+                        $just_matched = true;
+                        $CDATA = $closure;
+                        break;
+                    }
+                }
+            }
+            if ($just_matched) {
+                continue;
+            }
+        }
         if (preg_match('/\\\\?]\\\\?]>$/D', $string2_temp) && $CDATA) {
             $CDATA = false;
-            $string2 = preg_replace('/\\\\?]\\\\?]>$/D', '',
-                $string2_temp);
+            $string2 = preg_replace('/\\\\?]\\\\?]>$/D', '', $string2_temp);
             continue;
         }
-        if ($CDATA) {
+        if ($CDATA === true) {
             $string2 = match ($char) {
                 '[', ']' => "$string2\\$char",
                 default => "$string2$char",
             };
+        } elseif ($CDATA instanceof Closure) {
+            $string2 = $CDATA($string2, $char);
+        } else {
+            $string2 = "$string2$char";
+        }
+    }
+    $string1 = $string2;
+    $cache = '';
+    $return = [];
+    $literal = true;
+    $backslashed = false;
+    $collected_letters = '';
+    foreach (str_split($string2) as $char) {
+        if ($char == '\\' && $backslashed) {
+            $collected_letters = "$collected_letters\\";
+            $backslashed = false;
             continue;
         }
-        $string2 = "$string2$char";
-    }
-    foreach (str_split($string2) as $char) {
         if ($char == '\\') {
             $backslashed = true;
             continue;
@@ -155,7 +179,7 @@ function _lexer(string $string): array
     }
     if (strlen($collected_letters) > 0)
         $return[] = ['Text' => $collected_letters, 'type' => 'TEXT'];
-    return ['$return' => $return];
+    return ['$return' => $return, '$string1' => $string1];
 }
 
 function _AbstractSyntaxTree($semitokens): array
@@ -529,6 +553,7 @@ class _AST2 implements JsonSerializable
         ];
     }
 }
+
 function opening_tag_list_toString(array $opening_tags): string
 {
 
@@ -559,7 +584,6 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 //$parent = ($openingtags[count($openingtags) - 1] ?? $root)->name();
                 $thisContext = strtolower("{$li['name']}");
                 if (!$properly_closed) {
-                    //echo"\n&lt;$previously_opened::$thisContext&gt;<br/>";
                     if ($previously_opened === 'p' && in_array(
                             $thisContext, explode(',',
                             'p,ol,ul,li,h1,h2,h3,h4,h5,h6'))) {
@@ -579,7 +603,6 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                             } else {
                                 $list2 = $list;
                             }
-                            //echo "\n&lt;$list2&gt;<br/>";
                             $explodes_list = explode(',', $list2);
                             if (in_array('li', $explodes_list)) {
                                 foreach (array_reverse($openingtags) as $option) {
@@ -612,13 +635,10 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 $index = 0;
                 foreach (array_reverse($openingtags) as $item) {
                     $index++;
-                    //$count = count($openingtags);
-                    //echo "\n&lt;({$item->name()})::({$openingtag->name()})::($index)&gt;";
                     if ($item->name() === $openingtag->name()) {
                         break;
                     }
                 }
-                //echo "\n&lt;$index::" . count($openingtags) . "&gt;<br/>";
                 if (count($openingtags) >= $index && $index > 0) {
                     for ($i = 0; $i < $index; $i++) {
                         array_pop($openingtags);
@@ -724,7 +744,7 @@ class BBCode implements JsonSerializable
      */
     public function parse(): self
     {
-        $this->array['lexer'] = $lexer = _lexer("{$this->array['raw']}");
+        $this->array['lexer'] = $lexer = _lexer("{$this->array['raw']}", $this->parseModes);
         $this->array['AST1'] = $AbstractSyntaxTree1 = _AbstractSyntaxTree($lexer['$return']);
         $this->array['AST2'] = _AbstractSyntaxTree2($AbstractSyntaxTree1['$return']);
         $this->parsed = $this->array['AST3'] = $this->array['AST2']['$return'];

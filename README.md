@@ -54,7 +54,32 @@ where the key is the tag name and the value a function with the signature below
 ```php
 function (string $name, array $attributes, string $children, string $else): string
 ```
+
 then call the `parse` method and the `toHTML` method to extract the html.
+
+there also exist pre_parsemodes, you can define them by `pre:ParseModeName` with `/^pre:([a-zA-Z][a-zA-Z0-9]+)$/D` as
+requirement
+
+their function signature is
+
+```php
+function (string $string, string $char): string
+```
+
+their function is to change `<![ParseModeName[` behavior
+
+note that the string cannot contain `]]>` because that exits the preParseMode
+
+```php
+'CDATA' => (function (string $string, string $char): string {
+    return match ($char) {
+        '[', ']' => "$string\\$char",
+        default => "$string$char",
+    };
+}),
+```
+
+exists as default and cannot be changed. note that preParseModes must escape backslashes because if not they will escape other things
 
 ## installation
 
