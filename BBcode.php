@@ -101,6 +101,7 @@ function _lexer(string $string, array $parseModes): array
     $string2 = '';
     $CDATA = false;
     $parseModes_count = count($parseModes);
+    $end = '';
     foreach (str_split(_normalize_newlines__($string)) as $char) {
         $string2_temp = "$string2$char";
         if (preg_match('/<!\\[CDATA\\[$/D', $string2_temp) && !$CDATA) {
@@ -114,9 +115,19 @@ function _lexer(string $string, array $parseModes): array
                 if (preg_match('/^pre:([a-z_A-Z][a-z_A-Z0-9]*)$/D', "$parseMode", $matches)) {
                     $regex = "/<!\\[$matches[1]\\[$/D";
                     if (preg_match($regex, $string2_temp)) {
-                        $string2 = preg_replace($regex, '', $string2_temp);
                         $just_matched = true;
-                        $CDATA = $closure;
+                        $start = '';
+                        if ($closure instanceof Closure) {
+                            $CDATA = $closure;
+                        } elseif (gettype($closure) === 'array') {
+                            $CDATA = array_key_exists('closure', $closure) ? $closure['closure'] :
+                                (function (string $string, string $char): string {
+                                    return "$string$char";
+                                });
+                            $start = array_key_exists('start', $closure) ? "{$closure['start']}" : '';
+                            $end = array_key_exists('end',/**/ $closure) ? "{$closure['end']}" : '';
+                        }
+                        $string2 = preg_replace($regex, "$start", $string2_temp);
                         break;
                     }
                 }
@@ -127,7 +138,8 @@ function _lexer(string $string, array $parseModes): array
         }
         if (preg_match('/\\\\?]\\\\?]>$/D', $string2_temp) && $CDATA) {
             $CDATA = false;
-            $string2 = preg_replace('/\\\\?]\\\\?]>$/D', '', $string2_temp);
+            $string2 = preg_replace('/\\\\?]\\\\?]>$/D', "$end", $string2_temp);
+            $end = '';
             continue;
         }
         if ($CDATA === true) {
@@ -135,7 +147,7 @@ function _lexer(string $string, array $parseModes): array
                 '[', ']' => "$string2\\$char",
                 default => "$string2$char",
             };
-        } elseif ($CDATA instanceof Closure) {
+        } elseif ($CDATA instanceof Closure || gettype($CDATA) === 'string') {
             $string2 = $CDATA($string2, $char);
         } else {
             $string2 = "$string2$char";

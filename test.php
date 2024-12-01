@@ -5,24 +5,12 @@ require_once 'BBcode.php';
 // but not edit it to the repository, otherwise feel free to use this too.
 
 $COMPOUND = <<<'BBCODE'
-
+[time="2023-06-18T13:56:04Z" f="<![CDATA[[pre0-dayNumber] [MonthName] [year4]]]>"/]
 BBCODE;
 $bbcode = new BBCode("\n\n$COMPOUND\n\n");
 $outerHTML = (function (string $name, array $attributes, string $children, string $else): string {
     return $else;
 });
 $bbcode->parse()->setdebugMode(true)->addparseModes([
-    'spoiler' => (function (string $name, array $attrs, string $children, string $else): string {
-        $open = '';
-        if (array_key_exists('spoilerfor', $attrs)) {
-            $spoilerfor = "{$attrs['spoilerfor']}";
-        } else {
-            $spoilerfor = "spoilers";
-        }
-        if (array_key_exists('open', $attrs)) {
-            $open = "open=\"\"";
-        }
-        return "<details $open><summary>$spoilerfor</summary><div>$children</div></details>";
-    }),
 ]);
 echo "\n{$bbcode->toJSON_HTML(4)}";
