@@ -142,15 +142,16 @@ function _lexer(string $string, array $parseModes): array
             $end = '';
             continue;
         }
+        $string = $string2;
         if ($CDATA === true) {
             $string2 = match ($char) {
-                '[', ']' => "$string2\\$char",
-                default => "$string2$char",
+                '[', ']' => "$string\\$char",
+                default => "$string$char",
             };
         } elseif ($CDATA instanceof Closure || gettype($CDATA) === 'string') {
-            $string2 = $CDATA($string2, $char);
+            $string2 = $CDATA($string, $char);
         } else {
-            $string2 = "$string2$char";
+            $string2 = "$string$char";
         }
     }
     $string1 = $string2;
@@ -576,12 +577,26 @@ function opening_tag_list_toString(array $opening_tags): string
     return preg_replace('/^,/', '', $list);
 }
 
+function any_overlap(array $array1, array $array2, bool $strict = false): bool
+{
+    foreach ($array1 as $value) {
+        foreach ($array2 as $item) {
+            if ($strict) {
+                if ($value === $item) return true;
+            } else {
+                if ($value == $item) return true;
+            }
+        }
+    }
+    return false;
+}
+
 function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
 {
     $root = $openingtag = new _AST2('root', ['class' => 'bbcode_car']);
     $openingtags = [];
     $rtrn = array();
-    $properly_closed = false;
+    $properly_closed = true;
     $previously_opened = null;
     //$just_closed_tag_name = null;
     foreach ($AbstractSyntaxTree as $li) {
@@ -590,6 +605,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 $li['close-ment-type'] = 'SELF-CLOSING';
             }
         }
+        if ($root == $openingtag) $properly_closed = true;
         switch ($li['close-ment-type']) {
             case'OPENING':
                 // in memory of $lowercase_name_old and $lowercase_name_new
@@ -607,6 +623,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                         $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
                     } else {
                         $list = opening_tag_list_toString($openingtags);
+                        $p_close_on = explode(',', 'p,ol,ul,li,h1,h2,h3,h4,h5,h6');
                         if (in_array($thisContext, explode(',', 'li,ol,ul'))) {
                             if (($list2 = strrpos($list, 'ol')) !== false) {
                                 $list2 = substr($list, $list2);
@@ -621,14 +638,33 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                                     array_pop($openingtags);
                                     $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
                                     if ($option->name() == 'li') {
+                                        $properly_closed = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        } elseif (in_array($thisContext, $p_close_on)) {
+                            if (($list2 = strrpos($list, 'p')) !== false) {
+                                $list2 = substr($list, $list2);
+                            } else {
+                                $list2 = $list;
+                            }
+                            $explodes_list = explode(',', $list2);
+                            if (in_array('p', $explodes_list)) {
+                                foreach (array_reverse($openingtags) as $option) {
+                                    array_pop($openingtags);
+                                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                                    if ($option->name() == 'p') {
+                                        $properly_closed = true;
                                         break;
                                     }
                                 }
                             }
                         }
                     }
+                } else {
+                    $properly_closed = false;
                 }
-                $properly_closed = false;
                 $cache = new _AST2($li['name'], $li['attrs']);
                 $openingtag->appendChild($cache);
                 $openingtag = $cache;
@@ -657,7 +693,6 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                     }
                 } // else {array_pop($openingtags);}
                 $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                $properly_closed = true;
                 break;
             case'SELF-CLOSING':
                 $openingtag->appendChild(new _AST2($li['name'], $li['attrs']));
