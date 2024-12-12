@@ -591,12 +591,46 @@ function any_overlap(array $array1, array $array2, bool $strict = false): bool
     return false;
 }
 
+class _AST2_Tag implements JsonSerializable
+{
+
+    public function __construct(public _AST2|_AST2_TEXT $tag, public bool $properly_closed)
+    {
+    }
+
+    public function __toString(): string
+    {
+        return $this->properly_closed ? 'true' : 'false';
+    }
+
+    public function name(): string
+    {
+        return $this->tag->name();
+    }
+
+    public function appendChild(_AST2_Tag $child): self
+    {
+        $this->tag->appendChild($child->tag);
+        return $this;
+    }
+
+    public function unwrap(): _AST2_TEXT|_AST2
+    {
+        return $this->tag;
+    }
+
+    public function jsonSerialize(): mixed
+    {
+        return $this->tag->jsonSerialize();
+    }
+}
+
 function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
 {
     $root = $openingtag = new _AST2('root', ['class' => 'bbcode_car']);
     $openingtags = [];
     $rtrn = array();
-    $properly_closed = true;
+    //$properly_closed = true;
     $previously_opened = null;
     //$just_closed_tag_name = null;
     foreach ($AbstractSyntaxTree as $li) {
@@ -605,65 +639,58 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
                 $li['close-ment-type'] = 'SELF-CLOSING';
             }
         }
-        if ($root == $openingtag) $properly_closed = true;
         switch ($li['close-ment-type']) {
             case'OPENING':
                 // in memory of $lowercase_name_old and $lowercase_name_new
                 //$parent = ($openingtags[count($openingtags) - 1] ?? $root)->name();
                 $thisContext = strtolower("{$li['name']}");
-                if (!$properly_closed) {
-                    if ($previously_opened === 'p' && in_array(
-                            $thisContext, explode(',',
-                            'p,ol,ul,li,h1,h2,h3,h4,h5,h6'))) {
-                        array_pop($openingtags);
-                        $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                    }
-                    if ($thisContext === 'li' && $previously_opened === 'li') {
-                        array_pop($openingtags);
-                        $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                    } else {
-                        $list = opening_tag_list_toString($openingtags);
-                        $p_close_on = explode(',', 'p,ol,ul,li,h1,h2,h3,h4,h5,h6');
-                        if (in_array($thisContext, explode(',', 'li,ol,ul'))) {
-                            if (($list2 = strrpos($list, 'ol')) !== false) {
-                                $list2 = substr($list, $list2);
-                            } elseif (($list2 = strrpos($list, 'ul')) !== false) {
-                                $list2 = substr($list, $list2);
-                            } else {
-                                $list2 = $list;
-                            }
-                            $explodes_list = explode(',', $list2);
-                            if (in_array('li', $explodes_list)) {
-                                foreach (array_reverse($openingtags) as $option) {
-                                    array_pop($openingtags);
-                                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                                    if ($option->name() == 'li') {
-                                        $properly_closed = true;
-                                        break;
-                                    }
+
+                if ($previously_opened === 'p' && in_array(
+                        $thisContext, explode(',',
+                        'p,ol,ul,li,h1,h2,h3,h4,h5,h6'))) {
+                    array_pop($openingtags);
+                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                }
+                if ($thisContext === 'li' && $previously_opened === 'li') {
+                    array_pop($openingtags);
+                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                } else {
+                    $list = opening_tag_list_toString($openingtags);
+                    if (in_array($thisContext, explode(',', 'li,ol,ul'))) {
+                        if (($list2 = strrpos($list, 'ol')) !== false) {
+                            $list2 = substr($list, $list2);
+                        } elseif (($list2 = strrpos($list, 'ul')) !== false) {
+                            $list2 = substr($list, $list2);
+                        } else {
+                            $list2 = $list;
+                        }
+                        $explodes_list = explode(',', $list2);
+                        if (in_array('li', $explodes_list)) {
+                            foreach (array_reverse($openingtags) as $option) {
+                                array_pop($openingtags);
+                                $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                                if ($option->name() == 'li') {
+                                    break;
                                 }
                             }
-                        } elseif (in_array($thisContext, $p_close_on)) {
-                            if (($list2 = strrpos($list, 'p')) !== false) {
-                                $list2 = substr($list, $list2);
-                            } else {
-                                $list2 = $list;
-                            }
-                            $explodes_list = explode(',', $list2);
-                            if (in_array('p', $explodes_list)) {
-                                foreach (array_reverse($openingtags) as $option) {
-                                    array_pop($openingtags);
-                                    $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                                    if ($option->name() == 'p') {
-                                        $properly_closed = true;
-                                        break;
-                                    }
+                        }
+                    } elseif (in_array($thisContext, explode(',', 'p,ol,ul,li,h1,h2,h3,h4,h5,h6'))) {
+                        if (($list2 = strrpos($list, 'p')) !== false) {
+                            $list2 = substr($list, $list2);
+                        } else {
+                            $list2 = $list;
+                        }
+                        $explodes_list = explode(',', $list2);
+                        if (in_array('p', $explodes_list)) {
+                            foreach (array_reverse($openingtags) as $option) {
+                                array_pop($openingtags);
+                                $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                                if ($option->name() == 'p') {
+                                    break;
                                 }
                             }
                         }
                     }
-                } else {
-                    $properly_closed = false;
                 }
                 $cache = new _AST2($li['name'], $li['attrs']);
                 $openingtag->appendChild($cache);
@@ -704,7 +731,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
             default:
         }
     }
-    return ['$return' => $root, '$rtrn' => $rtrn];
+    return ['$return' => $root , '$rtrn' => $rtrn];
 }
 
 class BBCode implements JsonSerializable
