@@ -21,6 +21,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
+//require_once 'BBDom.php';
+//require_once 'BBElement.php';
 $whatis = [
     'name' => '\\[the tag\'s name]',
     'innerText' => '\\[the text inside the tag', 'attrs]' => [
@@ -89,11 +92,6 @@ function _explode2__(string $seperator, string $string, ExplodeType $ExplodeType
 function _implode2__(string $seperator, array $array): string
 {
     return implode($seperator, $array);
-}
-
-function h($bool, $exmen): string
-{
-    return "&lt;&quot;" . ($bool ? 'true' : 'false') . "&quot;::&quot;$exmen&quot;&gt;\n\n";
 }
 
 function _lexer(string $string, array $parseModes): array
@@ -731,7 +729,7 @@ function _AbstractSyntaxTree2(array $AbstractSyntaxTree): array
             default:
         }
     }
-    return ['$return' => $root , '$rtrn' => $rtrn];
+    return ['$return' => $root, '$rtrn' => $rtrn];
 }
 
 class BBCode implements JsonSerializable
@@ -825,6 +823,8 @@ class BBCode implements JsonSerializable
         return $this;
     }
 
+    //public function getDOM(): BBDom {return BBDom::createFrom($this);}
+
     /**
      * @return string|null output the html
      */
@@ -840,6 +840,11 @@ class BBCode implements JsonSerializable
         if (is_null($this->parsed)) return null;
         $bbraws = _htmlspecialchars12__(_json_fromArray__($this->toArray(), $indent));
         return "{$this->toHTML()}<pre class=bbcode_car style=font-family:monospace><code>$bbraws</code></pre>";
+    }
+
+    public function getAbstractSyntaxTree(): ?_AST2
+    {
+        return $this->parsed;
     }
 
     public function getRaw(): ?string
