@@ -797,6 +797,7 @@ class BBCode implements JsonSerializable
      * overwrites the array
      *
      * @see addparseModes
+     * @see addparseModes
      */
     public function setparseModes(array $parseModes): self
     {
@@ -839,7 +840,7 @@ class BBCode implements JsonSerializable
     {
         if (is_null($this->parsed)) return null;
         $bbraws = _htmlspecialchars12__(_json_fromArray__($this->toArray(), $indent));
-        return "{$this->toHTML()}<pre class=bbcode_car style=font-family:monospace><code>$bbraws</code></pre>";
+        return "{$this->toHTML()}<pre class=bbcode_car><code style=font-family:monospace>$bbraws</code></pre>";
     }
 
     public function getAbstractSyntaxTree(): ?_AST2
