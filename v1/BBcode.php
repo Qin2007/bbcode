@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
+$_BIGCOMMENT = <<<'BIGCOMMENT'
 //require_once 'BBDom.php';
 //require_once 'BBElement.php';
 $whatis = [
@@ -875,3 +875,4 @@ class BBCode implements JsonSerializable
         }
     }
 }
+BIGCOMMENT;

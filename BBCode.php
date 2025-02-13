@@ -1,5 +1,6 @@
 <?php namespace BBCode;
 
+use Error;
 use JsonSerializable;
 
 function htmlspecialchars12(string $value): string
@@ -45,7 +46,7 @@ class _AST2_TEXT implements JsonSerializable
 
     public function toString(): string
     {
-        return htmlspecialchars12("$this->string");
+        return ("$this->string");
     }
 
     public function __toString(): string
@@ -57,18 +58,38 @@ class _AST2_TEXT implements JsonSerializable
     {
         return ['string' => "$this->string", 'type' => '_AST2_TEXT'];
     }
+
+    public function invalidate(): self
+    {
+        return $this;
+    }
 }
+
+function href(string $href, string $children): string
+{
+    if (strlen($href) > 0) {
+        return "<a href=\"$href\">$children</a>";
+    } else {
+        return "$children";
+    }
+}
+
+//class headerCounter{private int $counted = 0;public function __construct(private readonly string $name){}public function send(string $value): self{$counted = ++$this->counted;header("$this->name-$counted: $value");return $this;}}
 
 class _AST2 implements JsonSerializable
 {
     private string $name;
     private array $attrs;
     private array $children = [];
+    private bool $invalidated = false;
 
-    public function __construct(string $tag_name, array $attrs = [])
+    //private string $outerHTML;
+
+    public function __construct(string $tag_name, array $attrs = [])//, string $outerHTML = '</>'
     {
         $this->name = $tag_name;
         $this->attrs = $attrs;
+        //$this->outerHTML = $outerHTML;
     }
 
     public function name(): string
@@ -98,7 +119,13 @@ class _AST2 implements JsonSerializable
         return $this->children;
     }
 
-    public function toString(array $parsemodes = [], array $options = null): string
+    public function invalidate(): self
+    {
+        $this->invalidated = true;
+        return $this;
+    }
+
+    public function toString(array $parsemodes = [], ?array $options = null): string
     {
         //$class = '';
         $attrs_str = '';
@@ -109,8 +136,19 @@ class _AST2 implements JsonSerializable
             //if ($key === 'class') $class = "class=\"$val\"";
         }
         $children = '';
+        if (array_key_exists('rawText', (array)$options) || $this->invalidated) {
+            $options = $options ?? [];
+            if ($options['rawText'] || $this->invalidated) {
+                $options['rawText'] = true;
+                $outerHTML = [];
+                foreach ($this->children as $child) {
+                    $outerHTML[] = $child->toString($parsemodes, $options);
+                }
+                return implode('', $outerHTML);
+            }
+        }
         foreach ($this->children as $child) {
-            $children = "$children{$child->toString(       $parsemodes, $options)}";
+            $children = "$children{$child->toString($parsemodes, $options)}";
         }
         $else = "[$this->name$attrs_str]{$children}[/$this->name]";
         return (function (self $self) use ($parsemodes, $else, $children) {
@@ -133,20 +171,20 @@ class _AST2 implements JsonSerializable
                 case'url':
                     $href = '';
                     if (array_key_exists('url', $attrs)) {
-                        $href = _htmlspecialchars12__(urlencode("{$attrs['url']}"));
+                        $href = htmlspecialchars12(urlencode("{$attrs['url']}"));
                     }
-                    return _href__($href, $children);
+                    return href($href, $children);
                 case'href':
                 case'a':
                     $href = '';
                     if (array_key_exists('href', $attrs)) {
-                        $href = _htmlspecialchars12__(urlencode("{$attrs['href']}"));
+                        $href = htmlspecialchars12(urlencode("{$attrs['href']}"));
                     }
-                    return _href__($href, $children);
+                    return href($href, $children);
                 case'color':
                     $style = '';
                     if (array_key_exists('color', $attrs)) {
-                        $color = _htmlspecialchars12__("{$attrs['color']}");
+                        $color = htmlspecialchars12("{$attrs['color']}");
                         if (preg_match('/^#?[a-zA-Z0-9]+/', "$color")) {
                             $style = "{$style}style=\"color:$color;\"";
                         } else {
@@ -157,7 +195,7 @@ class _AST2 implements JsonSerializable
                 case'p':
                     $style = '';
                     if (array_key_exists('color', $attrs)) {
-                        $color = _htmlspecialchars12__("{$attrs['color']}");
+                        $color = htmlspecialchars12("{$attrs['color']}");
                         if (preg_match('/^#?[a-zA-Z0-9]+/', "$color")) {
                             $style = "{$style}style=\"color:$color;\"";
                         }
@@ -167,7 +205,7 @@ class _AST2 implements JsonSerializable
                 case'ol':
                     $start = '';
                     if (array_key_exists('start', $attrs)) {
-                        $start = _htmlspecialchars12__("{$attrs['start']}");
+                        $start = htmlspecialchars12("{$attrs['start']}");
                         $start = "start=\"$start\"";
                     }
                     $reversed = '';
@@ -198,11 +236,16 @@ class _AST2 implements JsonSerializable
                     $size = '';
                     $url = '';
                     $style = '';
-                    $alt = _htmlspecialchars12__("{$attrs['alt']}");
+                    $alt = htmlspecialchars12("{$attrs['alt']}");
                     if (array_key_exists('src', $attrs)) {
-                        $src = _htmlspecialchars12__("{$attrs['src']}");
+                        $src = htmlspecialchars12("{$attrs['src']}");
                     } else {
-                        $src = _bbml_encode__("$children");
+                        // bbml_encode
+                        $src = (function (string $value): string {
+                            $str = htmlspecialchars12("$value");
+                            $str = str_replace('[', "\\[", "$str");
+                            return str_replace(']', "\\]", "$str");
+                        })("$children");
                     }
                     if (strlen($src) > 0) {
                         $url = "src=\"$src\"";
@@ -223,7 +266,8 @@ class _AST2 implements JsonSerializable
             'name' => $this->name,
             'attrs' => $this->attrs,
             'children' => $this->children,
-            'type' => '_AST2'
+            'invalidated' => $this->invalidated,
+            'type' => '_AST2',
         ];
     }
 }
@@ -241,7 +285,9 @@ class BBCode implements JsonSerializable
 
     public function parse(): self
     {
-        $this->parsed = $this->tag_joiner(($this->array['lexed'] = $this->lexer())['$return']);
+        if ($this->parsed === null) {
+            $this->parsed = $this->tag_joiner(($this->array['lexed'] = $this->lexer())['$return']);
+        }
         return $this;
     }
 
@@ -249,7 +295,6 @@ class BBCode implements JsonSerializable
     {
         $index = 0 - 1;
         $openingtags = [];
-        $previously_opened = null;
         $root = $openingtag = new _AST2('root', ['class' => 'bbcode_car']);
         while (array_key_exists(++$index, $tags)) {
             $li = $tags[$index];
@@ -260,24 +305,41 @@ class BBCode implements JsonSerializable
             }
             switch ($li['close-ment-type']) {
                 case'OPENING':
-                    $cache = new _AST2($li['name'], $li['attrs']);
+                    $cache = new _AST2($li['name'], $li['attrs'] /*,$li['tagtext']*/);
                     $openingtag->appendChild($cache);
                     /*$previously_opened = */
                     ($openingtag = $cache)->name();
                     $openingtags[] = $openingtag;
                     break;
                 case'SELF-CLOSING':
-                    $openingtag->appendChild(new _AST2($li['name'], $li['attrs']));
+                    $openingtag->appendChild(new _AST2($li['name'], $li['attrs'] /*,$li['tagtext']*/));
                     break;
                 case'CLOSING':
-                    array_pop($openingtags);
+                    $cache = array_pop($openingtags);
                     $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                    if ($cache->name() !== $li['name']) {
+                        $cache->invalidate();
+                    }
                     break;
                 case'TEXT':
                     $openingtag->appendChild(new _AST2_TEXT("{$li['Text']}"));
                     break;
                 default:
             }
+        }
+        if (count($openingtags) > 0) {
+            header('opening:true');
+            $indexedAttempts = 0;
+            while (++$indexedAttempts < 800) {
+                $cache = array_pop($openingtags);
+                if ($cache === $root || $cache === NULL) break;
+                $cache->invalidate();
+            }
+            if ($indexedAttempts >= 800) {
+                throw new Error('precaution Infinite Recursion');
+            }
+        } else {
+            header('opening:false');
         }
         return $root;
     }
@@ -292,26 +354,26 @@ class BBCode implements JsonSerializable
         $characters = str_split("{$this->array['raw']}");
         while (array_key_exists(++$index, $characters)) {
             $char = $characters[$index];
-            //
             if ($char == '\\' && $backslashed) {
                 $collected_letters[] = "\\";
                 $backslashed = false;
                 continue;
             } elseif ($char == '\\') {
+                $collected_letters[] = "\\";
                 $backslashed = true;
                 continue;
             }
-            if ($char === '[') {
+            if ($char === '[' && !$backslashed) {
                 if (count($collected_letters) > 0) {
                     $return[] = ['Text' => implode('', $collected_letters),
                         'type' => 'TEXT', 'when' => 'left-open', 'close-ment-type' => 'TEXT'];
                 }
                 $opened = true;
                 $collected_letters = ['['];
-            } elseif ($char == ']' && $opened) {
-                $text = implode('', $collected_letters) . ']';// '[' . . ']';
+            } elseif ($char == ']' && $opened && !$backslashed) {
+                $text = implode('', $collected_letters) . ']';
                 $tag = ['name' => '', 'attrs' => [], 'type' => '_AbstractSyntaxTree',
-                    'tagtext' => $text, 'innerText' => ''
+                    'tagtext' => $text, 'innerText' => '',
                 ];
                 if (str_starts_with($text, '[/')) {
                     $tag['close-ment-type'] = 'CLOSING';
@@ -325,14 +387,23 @@ class BBCode implements JsonSerializable
                 $PHASE = 'NAME';
                 $quoted = false;
                 $val_reached = false;
+                $backslashed2 = false;
                 $preg_result = preg_replace('/^\\[\\/?/', '', $text);
+                $preg_result = preg_replace('/\\/?]$/D', '', $preg_result);
                 foreach (str_split($preg_result) as $explode) {
+                    if ($explode == '\\' && $backslashed2) {
+                        $backslashed2 = false;
+                        continue;
+                    } elseif ($explode == '\\') {
+                        $backslashed2 = true;
+                        continue;
+                    }
                     switch ($PHASE) {
                         case'NAME':
                             if (preg_match('/[a-zA-Z\\-_0-9*]/', "$explode")) {
                                 $tag['name'] = "{$tag['name']}$explode";
                             } else {
-                                if ($tag['close-ment-type'] == 'CLOSING') {
+                                if ($tag['close-ment-type'] === 'CLOSING') {
                                     $PHASE = 'END';
                                     break;
                                 }
@@ -350,11 +421,12 @@ class BBCode implements JsonSerializable
                                 $quoted = true;
                                 break;
                             }
-                            if (preg_match('/[a-zA-Z0-9]/', $explode)) {
+                            //if (preg_match('/[a-zA-Z0-9]/', $explode)) {$val_reached = true;}
+                            if (preg_match('/[^"\\s]/', $explode)) {
                                 $val_reached = true;
                             }
                             if ($quoted) {
-                                if ($explode == '"') {
+                                if ($explode == '"' && $backslashed2) {
                                     $PHASE = 'tween';
                                     $tag['attrs']["$key"] = $val;
                                     $val_reached = false;
@@ -372,15 +444,7 @@ class BBCode implements JsonSerializable
                                     $val = '';
                                     break;
                                 }
-                                if ($explode === ']') {
-                                    $PHASE = 'tween';
-                                    $tag['attrs']["$key"] = $val;
-                                    $val_reached = false;
-                                    $quoted = false;
-                                    $key = '';
-                                    $val = '';
-                                    break;
-                                }
+                                //if ($explode === ']' && !$backslashed2) {$PHASE = 'tween';$tag['attrs']["$key"] = $val;$val_reached = false;$quoted = false;$key = '';$val = '';break;}
                             }
                             if ($val_reached) {
                                 $val = "$val$explode";
@@ -427,6 +491,7 @@ class BBCode implements JsonSerializable
             } else {
                 $collected_letters[] = $char;
             }
+            $backslashed = false;
         }
         $return[] = ['Text' => implode('', $collected_letters),
             'type' => 'TEXT', 'when' => 'final bytes', 'close-ment-type' => 'TEXT'];
@@ -446,7 +511,6 @@ class BBCode implements JsonSerializable
 
     public function toArray(): ?array
     {
-        if (is_null($this->parsed)) return null;
         return ['parsed' => $this->parsed, 'innerArray' => $this->array];
     }
 }

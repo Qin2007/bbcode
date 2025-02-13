@@ -18,7 +18,8 @@ outerHTML
 [no parse]
 
 BBCODE. "\nafter-end";
-$bbcode = new BBCode("$COMPOUND");
+//$bbcode = new BBCode("[no op=\"\\[\\\"\\]\"/]");
+$bbcode = new BBCode("[no op=\"\\\"\\\"\\\"\\\"\"/]");
 $outerHTML = (function (string $name, array $attributes, string $children, string $else): string {
     return $else;
 });/*addparseModes([
@@ -35,4 +36,5 @@ $outerHTML = (function (string $name, array $attributes, string $children, strin
 ]->)*/
 //echo "\n<pre>";
 //ob_start('BBCode\\htmlspecialchars12');
-echo "\n{$bbcode->parse()->toHTML()}";
+echo "\n<pre>" . htmlspecialchars12($bbcode->parse()->toHTML());
+echo "\n\n" . htmlspecialchars12(json_fromArray($bbcode->toArray()));
