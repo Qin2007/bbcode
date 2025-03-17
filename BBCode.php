@@ -426,7 +426,7 @@ class BBCode implements JsonSerializable
                                 $val_reached = true;
                             }
                             if ($quoted) {
-                                if ($explode == '"' && $backslashed2) {
+                                 if ($explode == '"' && !$backslashed2) {
                                     $PHASE = 'tween';
                                     $tag['attrs']["$key"] = $val;
                                     $val_reached = false;
@@ -483,6 +483,7 @@ class BBCode implements JsonSerializable
                             break;
                         default:
                     }
+                    $backslashed2 = false;
                 }
                 $return[] = $tag;
                 //
@@ -513,4 +514,14 @@ class BBCode implements JsonSerializable
     {
         return ['parsed' => $this->parsed, 'innerArray' => $this->array];
     }
+}
+
+function objectToString(mixed $mixed): string
+{
+    return match ($mixed) {
+        null => 'NULL',
+        true => 'true',
+        false => 'false',
+        default => (is_array($mixed) ? implode(',', $mixed) : "$mixed"),
+    };
 }

@@ -1,4 +1,6 @@
-<?= '<!DOCTYPE html><title>BBCode parser</title><style>body{font-family: monospace}</style>' .
+<?php
+$_=<<<'COMMWNT'
+?= '<!DOCTYPE html><title>BBCode parser</title><style>body{font-family: monospace}</style>' .
 '<style>a:visited,a:link{color:blue;}a:hover{color:orangered;}a:active{color:black;}</style>';
 require_once 'BBcode.php';
 
@@ -12,14 +14,10 @@ use function BBCode\json_fromArray;
 $COMPOUND = <<<'BBCODE'
 before-begin
 [h1]Hello.spec[/h1]
-[p start=here]Hello.spec[/p]
+[p start=here]Hello.spec
 outerHTML
-[no parse
-[no parse]
-
 BBCODE. "\nafter-end";
-//$bbcode = new BBCode("[no op=\"\\[\\\"\\]\"/]");
-$bbcode = new BBCode("[no op=\"\\\"\\\"\\\"\\\"\"/]");
+$bbcode = new BBCode("<$COMPOUND>");
 $outerHTML = (function (string $name, array $attributes, string $children, string $else): string {
     return $else;
 });/*addparseModes([
@@ -36,5 +34,6 @@ $outerHTML = (function (string $name, array $attributes, string $children, strin
 ]->)*/
 //echo "\n<pre>";
 //ob_start('BBCode\\htmlspecialchars12');
-echo "\n<pre>" . htmlspecialchars12($bbcode->parse()->toHTML());
-echo "\n\n" . htmlspecialchars12(json_fromArray($bbcode->toArray()));
+echo "\n<pre>" . htmlspecialchars12($bbcode->parse()->toHTML()) . "</pre>";
+echo "\n\n<pre>" . htmlspecialchars12(json_fromArray($bbcode->toArray()));
+COMMWNT;
