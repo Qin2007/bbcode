@@ -136,8 +136,8 @@ class _AST2 implements JsonSerializable
             //if ($key === 'class') $class = "class=\"$val\"";
         }
         $children = '';
-        if (array_key_exists('rawText', (array)$options) || $this->invalidated) {
-            $options = $options ?? [];
+        $options = $options ?? [];
+        if (array_key_exists('rawText', $options) || $this->invalidated) {
             if ($options['rawText'] || $this->invalidated) {
                 $options['rawText'] = true;
                 $outerHTML = [];
@@ -265,9 +265,8 @@ class _AST2 implements JsonSerializable
         return [
             'name' => $this->name,
             'attrs' => $this->attrs,
-            'children' => $this->children,
             'invalidated' => $this->invalidated,
-            'type' => '_AST2',
+            'type' => '_AST2', 'children' => $this->children,
         ];
     }
 }
@@ -305,6 +304,10 @@ class BBCode implements JsonSerializable
             }
             switch ($li['close-ment-type']) {
                 case'OPENING':
+                    if ($li['name'] === 'p' && $openingtag?->name() === 'p') {
+                        array_pop($openingtags);
+                        $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
+                    }
                     $cache = new _AST2($li['name'], $li['attrs'] /*,$li['tagtext']*/);
                     $openingtag->appendChild($cache);
                     /*$previously_opened = */
@@ -315,11 +318,9 @@ class BBCode implements JsonSerializable
                     $openingtag->appendChild(new _AST2($li['name'], $li['attrs'] /*,$li['tagtext']*/));
                     break;
                 case'CLOSING':
-                    $cache = array_pop($openingtags);
+                    /*$cache =*/ array_pop($openingtags);
                     $openingtag = $openingtags[count($openingtags) - 1] ?? $root;
-                    if ($cache->name() !== $li['name']) {
-                        $cache->invalidate();
-                    }
+                    //if ($cache->name() !== $li['name']) {$cache->invalidate();}
                     break;
                 case'TEXT':
                     $openingtag->appendChild(new _AST2_TEXT("{$li['Text']}"));
@@ -327,7 +328,7 @@ class BBCode implements JsonSerializable
                 default:
             }
         }
-        if (count($openingtags) > 0) {
+        /*if (count($openingtags) > 0) {
             header('opening:true');
             $indexedAttempts = 0;
             while (++$indexedAttempts < 800) {
@@ -338,9 +339,7 @@ class BBCode implements JsonSerializable
             if ($indexedAttempts >= 800) {
                 throw new Error('precaution Infinite Recursion');
             }
-        } else {
-            header('opening:false');
-        }
+        } else {header('opening:false');}*/
         return $root;
     }
 
@@ -426,7 +425,7 @@ class BBCode implements JsonSerializable
                                 $val_reached = true;
                             }
                             if ($quoted) {
-                                 if ($explode == '"' && !$backslashed2) {
+                                if ($explode == '"' && !$backslashed2) {
                                     $PHASE = 'tween';
                                     $tag['attrs']["$key"] = $val;
                                     $val_reached = false;
@@ -505,7 +504,7 @@ class BBCode implements JsonSerializable
         return $this->parsed->toString();
     }
 
-    public function jsonSerialize(): array
+    public function jsonSerialize(): ?array
     {
         return $this->toArray();
     }
