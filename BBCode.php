@@ -501,7 +501,7 @@ class BBCode implements JsonSerializable
     public function toHTML(): ?string
     {
         if (is_null($this->parsed)) return null;
-        return $this->parsed->toString();
+        return $this->parsed->toString($this->parseModes);
     }
 
     public function jsonSerialize(): ?array
@@ -512,6 +512,55 @@ class BBCode implements JsonSerializable
     public function toArray(): ?array
     {
         return ['parsed' => $this->parsed, 'innerArray' => $this->array];
+    }
+
+    /**
+     * @param array $parseModes an associative array where the keys are the tag name the user needs to use
+     * the value needs to be a function with
+     * function (string $name, array $attributes, string $children, string $else):string
+     * as signature and values are passed
+     *
+     * string $name: the name of the tag
+     *
+     * array $attributes: the attributes passed to the tag as an associative array
+     *
+     * string $children: a string meant to put without modifications, used for tag nesting and in between content
+     *
+     * string $else: the string used to invike this bbcode command, you can return this to putout it as is
+     *
+     * the function should output raw html
+     * @return $this for method chaining
+     */
+    public function addparseModes(array $parseModes): self
+    {
+        foreach ($parseModes as $parseName => $parseMode) {
+            if ('settings' === $parseName) {
+                /*if (is_array($parseMode)) {if (array_key_exists('htmlencode', $parseMode)) {$this->options['htmlencode'] = $parseMode['htmlencode'];}}*/
+                continue;
+            }
+            $this->parseModes[$parseName] = $parseMode;
+        }
+        return $this;
+    }
+
+    /**
+     * @return array
+     * @see addparseModes
+     */
+    public function getparseModes(): array
+    {
+        return $this->parseModes;
+    }
+
+    /**
+     * overwrites the array
+     *
+     * @see addparseModes
+     */
+    public function setparseModes(array $parseModes): self
+    {
+        $this->parseModes = [];
+        return $this->addparseModes($parseModes);
     }
 }
 

@@ -792,7 +792,6 @@ class BBCode implements JsonSerializable
         return $this->parseModes;
     }
 
-
     /**
      * overwrites the array
      *
